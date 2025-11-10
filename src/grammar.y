@@ -2,73 +2,82 @@
     #include <stdio.h>
     #include <string.h>
     #include <stdlib.h>
-    #include "lex.yy.c"
-    
-	static void yyerror(const char* msg);
 
+
+    /* Datatype for symbol description */
     struct symbol {
         char * id_name;
         char * data_type;
         int line;
     };
     
+    /* Datatype for symbol table handling */
     struct table_elem {
     	struct symbol row;
     	struct table_elem *next;
     };
 	
+    /* Datatype for parse tree nodes */
 	struct node {
 	  	struct node *left;
 	  	struct node *right;
 	  	char *token;
-		char typenode[10];	// NULL if is a variable     
-	};
+		char typenode[10];	/* NULL if is a variable */
+    };
     
-	static void addError(char *);
-    static void save_type();
+	
+    static void yyerror(const char * msg);
+	static void add_error(char *);
+    static void save_type(void);
     static int search(char *);
 	static void insert_row(struct table_elem *);
-    static void add();
-	static struct node* mknode(struct node *, struct node *, char *);
+    static void add(void);
+	static struct node * mknode(struct node *, struct node *, char *);
 	static int check_declaration(char *);
 	static int compare_types(char *, char *);
-	static char *get_type(char *);
+	static char * get_type(char *);
 	static int check_assignment(char *, char *);
 	static int check_compare(char *, char *);
-	static int getConvtype(char *);
-	static char *getVal(struct node *);
-	static char *getCondition(struct node *);
-	static char *getConditions(struct node *);
-	static char *getDeclaration(struct node *);
-	static char *getAssignment(struct node *);
-	static char *getWhile(struct node *);
-	static char *getIfElse(struct node *);
-	static char *getIO(struct node *);
-	static char *getStatement(struct node *);
-	static char *generateCode(struct node *);
-	static void returnTree(struct node *, int);
-	static void freeTable();
-	static void freeTree();
-	void getTable();
-    void getTree();
-	void getCode(FILE *);
-	void getErrors();
-	void freeAll();
+	static int get_convtype(char *);
+	static char * get_val(struct node *);
+	static char * get_condition(struct node *);
+	static char * get_conditions(struct node *);
+	static char * get_declaration(struct node *);
+	static char * get_assignment(struct node *);
+	static char * get_while(struct node *);
+	static char * get_if_else(struct node *);
+	static char * get_io(struct node *);
+	static char * get_statement(struct node *);
+	static char * generate_code(struct node *);
+	static void return_tree(struct node *, int);
+	static void free_table(void);
+	static void free_tree(struct node *);
+	
+    void free_all(void);
+	void get_table(void);
+    void get_tree(void);
+	void get_code(FILE *);
+	void get_errors(void);
+	int yylex(void);
 
-    extern int countln;     						// variable in lexer.l that counts the lines
-	static struct table_elem *first, *last, *selected;		// pointers for symbol table
-	static struct node *head = NULL;						// head of the parse tree
-    static char type[10];             						// used to set the variable type
-	static char **errors = NULL;
-	int err_num=0;
-	static char *includes = "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\n";
-	static char *cts = "char * charToStr(char c) {char *temp = (char *) malloc (sizeof(char)); temp[0]=c; return temp;}\n";
-	static char *cnct = "char * concat(char *dest, char *src) {char *temp; temp = strdup(dest); strcat(temp, src); return temp;}\n";
-	static char *sbstr = "int isSubstr(char *str, char *substr) { if(strstr(str,substr)==NULL) return 0; else return 1; }\n";
-	static char *gcn = "char getCharN(char *str, int n) {if(n<strlen(str)) return str[n]; else return 0; }\n";
-	static char *dnc = "char *delNChar(char *str, int n, int s) { switch(s) { case 0: { if(n>=strlen(str)) { return strdup(\"\"); } else { char temp[strlen(str)-n+1]; for(int i=0; i<strlen(str); i++) { temp[i] = str[n+i]; } temp[strlen(str)+1]=0; return strdup(temp); } break; } case 1: { if(n>=strlen(str)) { return strdup(\"\"); } else { char temp[strlen(str)-n+1]; for(int i=0; i<strlen(str)-n; i++) { temp[i] = str[i]; } temp[strlen(str)-n+1]=0; return strdup(temp); } break; } } }\n";
-	static char *getStr = "char * getStringa() { char temp[BUFSIZ]; scanf(\"%s\", temp); getchar(); return strdup(temp); }\n";
-	static char *mn = "\nint main(){\n";
+
+    extern int countln;                                     /* Variable for line number defined in lexer.l */
+	extern char * yytext;
+	
+    static struct table_elem *first, *last, *selected;		/* Symbol table pointers */
+	static struct node * head = NULL;						/* Head of the parse tree */
+    static char type[10];             						/* Temp buffer for datatype setting */
+	static char ** errors = NULL;
+	static char * includes = "#include <stdio.h>\n#include <string.h>\n#include <stdlib.h>\n\n";
+	static char * cts = "char * charToStr(char c) {char *temp = (char *) malloc (sizeof(char)); temp[0]=c; return temp;}\n";
+	static char * cnct = "char * concat(char *dest, char *src) {char *temp; temp = strdup(dest); strcat(temp, src); return temp;}\n";
+	static char * sbstr = "int isSubstr(char *str, char *substr) { if(strstr(str,substr)==NULL) return 0; else return 1; }\n";
+	static char * gcn = "char getCharN(char *str, int n) {if(n<strlen(str)) return str[n]; else return 0; }\n";
+	static char * dnc = "char *delNChar(char *str, int n, int s) { switch(s) { case 0: { if(n>=strlen(str)) { return strdup(\"\"); } else { char temp[strlen(str)-n+1]; for(int i=0; i<strlen(str); i++) { temp[i] = str[n+i]; } temp[strlen(str)+1]=0; return strdup(temp); } break; } case 1: { if(n>=strlen(str)) { return strdup(\"\"); } else { char temp[strlen(str)-n+1]; for(int i=0; i<strlen(str)-n; i++) { temp[i] = str[i]; } temp[strlen(str)-n+1]=0; return strdup(temp); } break; } } }\n";
+	static char * getStr = "char * getStringa() { char temp[BUFSIZ]; scanf(\"%s\", temp); getchar(); return strdup(temp); }\n";
+	static char * mn = "\nint main(){\n";
+    
+    int err_num = 0;
 %}
 
 %union { 
@@ -101,7 +110,8 @@ statement:		type ID    				{
 					if (check_declaration($1.name)) {
 						typeRvalue = (get_type($3.name) == NULL) ? $3.nd->typenode : get_type($3.name);
 						result_check = check_assignment(get_type($1.name), typeRvalue);
-						switch(result_check) {	// check if the datatypes of the assignment are compatible
+						/* Check if datatypes of the assignment are compatible */
+                        switch (result_check) {
 							case -1: {
 								sprintf(temp_error, "Line %d: Incompatible assignment Intero <- Stringa\n", countln);
 								break;	
@@ -123,8 +133,8 @@ statement:		type ID    				{
 								break;	
 							}
 						}
-						if(result_check<0) {
-							addError(temp_error);
+						if (result_check<0) {
+							add_error(temp_error);
 						}
 					}
 				}						
@@ -156,7 +166,8 @@ condition: 		val compare val     	{
 					typeLvalue = (get_type($1.name) == NULL) ? $1.nd->typenode : get_type($1.name);
 					typeRvalue = (get_type($3.name) == NULL) ? $3.nd->typenode : get_type($3.name);
 					result_check = check_compare(typeLvalue, typeRvalue);
-					switch(result_check) {	// check if the datatypes of the condition are compatible
+                    /* Check if datatypes of the condition are compatible */
+					switch (result_check) {
 						case -1: {
 							sprintf(temp_error, "Line %d: Incompatible comparison between Intero and Stringa\n", countln);
 							break;
@@ -182,8 +193,8 @@ condition: 		val compare val     	{
 							break;
 						}
 					}
-					if(result_check<0) {
-						addError(temp_error);
+					if (result_check<0) {
+						add_error(temp_error);
 					}
 				}           
          	;
@@ -194,18 +205,18 @@ operation: 	mathop val val		{
 				$$.nd = mknode($2.nd, $3.nd, $1.name);
 				typeLvalue = (get_type($2.name) == NULL) ? $2.nd->typenode : get_type($2.name);
 				typeRvalue = (get_type($3.name) == NULL) ? $3.nd->typenode : get_type($3.name);
-				switch (compare_types(typeLvalue, typeRvalue)) { // check if types are comparable and if they are a datatype is assigned to the operation
+                /* Check if datatypes are compatible, if so assign it to the operation */
+				switch (compare_types(typeLvalue, typeRvalue)) {
 					case 0: {
-						if(strcmp(typeLvalue, "Stringa")) {
+						if (strcmp(typeLvalue, "Stringa")) {
 							strcpy($$.nd->typenode, typeLvalue);
 						}
 						else {
-							if(!strcmp($1.name, "+")) strcpy($$.nd->typenode, "Stringa");
-							else if(!strcmp($1.name, "%")) strcpy($$.nd->typenode, "Intero");
-							else {
-								sprintf(temp_error, "Line %d: Invalid operand in operation %s %s %s, %s must be a Intero or Reale\n", countln, $1.name, getVal($2.nd), getVal($3.nd), getVal($3.nd));
-							}
-						}
+							if (!strcmp($1.name, "+")) strcpy($$.nd->typenode, "Stringa");
+							else if (!strcmp($1.name, "%")) strcpy($$.nd->typenode, "Intero");
+							else sprintf(temp_error, "Line %d: Invalid operand in operation %s %s %s, %s must be a Intero or Reale\n", 
+                                            countln, $1.name, get_val($2.nd), get_val($3.nd), get_val($3.nd));
+                        }
 						break;	
 					}
 					case 1: {
@@ -217,19 +228,17 @@ operation: 	mathop val val		{
 						break;	
 					}
 					case 3: {
-						if(!strcmp($1.name, "+")) strcpy($$.nd->typenode, "Stringa");
-						else if(!strcmp($1.name, "%")) strcpy($$.nd->typenode, "Intero");
-						else {
-							sprintf(temp_error, "Line %d: Invalid operand in operation %s %s %s, %s must be a Intero or Reale\n", countln, $1.name, getVal($2.nd), getVal($3.nd), getVal($3.nd));
-						}
+						if (!strcmp($1.name, "+")) strcpy($$.nd->typenode, "Stringa");
+						else if (!strcmp($1.name, "%")) strcpy($$.nd->typenode, "Intero");
+						else sprintf(temp_error, "Line %d: Invalid operand in operation %s %s %s, %s must be a Intero or Reale\n", 
+                                        countln, $1.name, get_val($2.nd), get_val($3.nd), get_val($3.nd));
 						break;	
 					}
 					case 4: {
-						if(!strcmp($1.name, "*")) strcpy($$.nd->typenode, "Carattere");
-						else if(!strcmp($1.name, "-") || !strcmp($1.name, "/")) strcpy($$.nd->typenode, "Stringa");
-						else {
-							sprintf(temp_error, "Line %d: Invalid operand in operation %s %s %s, %s must be a Stringa or Carattere\n", countln, $1.name, getVal($2.nd), getVal($3.nd), getVal($3.nd));
-						}
+						if (!strcmp($1.name, "*")) strcpy($$.nd->typenode, "Carattere");
+						else if (!strcmp($1.name, "-") || !strcmp($1.name, "/")) strcpy($$.nd->typenode, "Stringa");
+						else sprintf(temp_error, "Line %d: Invalid operand in operation %s %s %s, %s must be a Stringa or Carattere\n", 
+                                        countln, $1.name, get_val($2.nd), get_val($3.nd), get_val($3.nd));
 						break;
 					}
 					case -1: {
@@ -242,7 +251,7 @@ operation: 	mathop val val		{
 					}
 				}
 				if(temp_error[0]) {
-					addError(temp_error);
+					add_error(temp_error);
 				}
 			}
          	;
@@ -307,33 +316,45 @@ logicop: 	AND
 
 %%
 
-static void addError(char *s) {
+/* Function called by default by lex/yacc when a syntax error occurs */
+static void yyerror(const char* msg) {
+	char temp_error[BUFSIZ];
+	sprintf(temp_error, "Line %d: %s\n", countln, msg);
+	add_error(temp_error);
+}
+
+static void add_error(char * s) {
 	errors = (char **) realloc(errors, (err_num+1)*sizeof(char *));
 	errors[err_num++] = strdup(s);
 }
 
-static void save_type() {	// saves data type of the last variable initialized
+/* Saves datatype of the last initialized variable */
+static void save_type(void) {
     strcpy(type, yytext);
 }
 
-static int search(char *id) {	// test if the variable was already declared
+/* Tests if the variable was already declared */
+static int search(char * id) {
 	int res=0;
     for (selected=first; selected!=NULL; selected=selected->next) {
         if (!strcmp(selected->row.id_name, id)) {   
             res=1;
+        } else if (selected->next == NULL) {
+            last = selected;
         }
-		else if (selected->next == NULL) last = selected;
-    } 
+    }
     return res;
 }
 
-static void insert_row(struct table_elem *elem) {	// insert row in symbol table
+/* Inserts a row in the symbol table */
+static void insert_row(struct table_elem * elem) {
 	elem->row.id_name = strdup(yytext);
 	elem->row.data_type = strdup(type);
 	elem->row.line = countln;
 }
 
-static void add() {	// insert variable in symbol table
+/* Inserts a variable in the symbol table */
+static void add(void) {
 	char temp_error[BUFSIZ];
     if (first != NULL) {
 		if (!(search(yytext))) {
@@ -341,19 +362,18 @@ static void add() {	// insert variable in symbol table
 			selected->next = (struct table_elem *) malloc (sizeof(struct table_elem));
 			selected = selected->next;
 			insert_row(selected);
-		}
-		else {
+		} else {
 			sprintf(temp_error, "Line %d: Multiple declarations of \"%s\"\n", countln, yytext);
-			addError(temp_error);
+			add_error(temp_error);
 		}
-    }
-	else {
+    } else {
 		first = (struct table_elem *) malloc (sizeof(struct table_elem));
 		insert_row(first);
 	}
 }
 
-static struct node* mknode(struct node *l, struct node *r, char *t) {	// initialize the node of nd_obj
+/* Initializes the nod of nd_obj */
+static struct node * mknode(struct node * l, struct node * r, char * t) {
 	struct node *newnode = (struct node *) malloc(sizeof(struct node));
 	newnode->left = l;
 	newnode->right = r;
@@ -361,8 +381,9 @@ static struct node* mknode(struct node *l, struct node *r, char *t) {	// initial
 	return newnode;
 }
 
-static int check_declaration(char * c) {	// check if a variable was declared before usage, generating an error if not
-	int res=1;
+/* Checks if a variable was declared before usage, generating an error if not */
+static int check_declaration(char * c) {
+    int res=1;
 	if (!(search(c))) {
 		char temp[BUFSIZ];
 		errors = (char **) realloc(errors, (err_num+1)*sizeof(char *));
@@ -373,8 +394,9 @@ static int check_declaration(char * c) {	// check if a variable was declared bef
 	return res;
 }
 
-static int compare_types(char *type1, char *type2) { // analyze the types of the operands to understand which casting to do
-	int res=0;	// if it's not modified than the types are the same
+/* Analyzes the datatypes of the operands to understand which casting to perform */
+static int compare_types(char * type1, char * type2) {
+	int res=0;	/* if it remains unchanged, then the two datatypes are the same */
 	if ((!strcmp(type1, "Intero") && !strcmp(type2, "Carattere")) || (!strcmp(type1, "Carattere") && !strcmp(type2, "Intero"))) res=1;
 	else if ((!strcmp(type1, "Reale") && (!strcmp(type2, "Intero") || !strcmp(type2, "Carattere"))) || (!strcmp(type2, "Reale") && (!strcmp(type1, "Intero") || !strcmp(type1, "Carattere")))) res=2;
 	else if ((!strcmp(type1, type2) && !strcmp(type1, "Carattere")) || (!strcmp(type1, "Stringa") && !strcmp(type2, "Carattere")) || (!strcmp(type1, "Carattere") && !strcmp(type2, "Stringa"))) res=3;
@@ -384,57 +406,8 @@ static int compare_types(char *type1, char *type2) { // analyze the types of the
 	return res;
 }
 
-static int check_assignment(char *ltype, char *rtype) {	// check if the assignment is possible given the types of left and right val
-	int res=0;	// if it's not modified than the types are the same
-	if (!strcmp(ltype, "Intero")) {
-		if (!strcmp(rtype, "Reale")) res=1;
-		else if (!strcmp(rtype, "Carattere")) res=2;
-		else if (!strcmp(rtype, "Stringa")) res=-1;
-	}
-	else if (!strcmp(ltype, "Reale")) {
-		if (!strcmp(rtype, "Intero")) res=3;
-		else if (!strcmp(rtype, "Carattere")) res=4;
-		else if (!strcmp(rtype, "Stringa")) res=-2;
-	}
-	else if (!strcmp(ltype, "Carattere")) {
-		if (!strcmp(rtype, "Intero")) res=5;
-		else if (!strcmp(rtype, "Reale")) res=6;
-		else if (!strcmp(rtype, "Stringa")) res=-3;
-	}
-	else if (!strcmp(ltype, "Stringa")) {
-		if (!strcmp(rtype, "Intero")) res=-4;
-		else if (!strcmp(rtype, "Reale")) res=-5;
-		else if (!strcmp(rtype, "Carattere")) res=7;
-	}
-	return res;
-}
-
-static int check_compare(char *ltype, char *rtype) {	// check if the compare can be done given the types of left and right val
-	int res=0;	// if it's not modified than the types are the same
-	if (!strcmp(ltype, "Intero")) {
-		if (!strcmp(rtype, "Reale")) res=1;
-		else if (!strcmp(rtype, "Carattere")) res=2;
-		else if (!strcmp(rtype, "Stringa")) res=-1;
-	}
-	else if (!strcmp(ltype, "Reale")) {
-		if (!strcmp(rtype, "Intero")) res=3;
-		else if (!strcmp(rtype, "Carattere")) res=4;
-		else if (!strcmp(rtype, "Stringa")) res=-2;
-	}
-	else if (!strcmp(ltype, "Carattere")) {
-		if (!strcmp(rtype, "Intero")) res=5;
-		else if (!strcmp(rtype, "Reale")) res=6;
-		else if (!strcmp(rtype, "Stringa")) res=-3;
-	}
-	else if (!strcmp(ltype, "Stringa")) {
-		if (!strcmp(rtype, "Intero")) res=-4;
-		else if (!strcmp(rtype, "Reale")) res=-5;
-		else if (!strcmp(rtype, "Carattere")) res=-6;
-	}
-	return res;
-}
-
-static char * get_type(char *var) {	// return the data type of the given variable
+/* Returns the datatype of the variable */
+static char * get_type(char * var) {
 	char *res=NULL;
 	for (selected = first; selected != NULL; selected = selected->next) {
         if (!strcmp(selected->row.id_name, var)) {   
@@ -444,7 +417,54 @@ static char * get_type(char *var) {	// return the data type of the given variabl
 	return res;	
 }
 
-static int getConvtype(char *type) {	// returns the converted type in C language given the one of BPLC
+/* Checks if the assignment is possible givent the datatype on the left and the one on the right */
+static int check_assignment(char * ltype, char * rtype) {
+	int res=0;	/* if it remains unchanged, then the two datatypes are the same */
+    if (!strcmp(ltype, "Intero")) {
+		if (!strcmp(rtype, "Reale")) res=1;
+		else if (!strcmp(rtype, "Carattere")) res=2;
+		else if (!strcmp(rtype, "Stringa")) res=-1;
+	} else if (!strcmp(ltype, "Reale")) {
+		if (!strcmp(rtype, "Intero")) res=3;
+		else if (!strcmp(rtype, "Carattere")) res=4;
+		else if (!strcmp(rtype, "Stringa")) res=-2;
+	} else if (!strcmp(ltype, "Carattere")) {
+		if (!strcmp(rtype, "Intero")) res=5;
+		else if (!strcmp(rtype, "Reale")) res=6;
+		else if (!strcmp(rtype, "Stringa")) res=-3;
+	} else if (!strcmp(ltype, "Stringa")) {
+		if (!strcmp(rtype, "Intero")) res=-4;
+		else if (!strcmp(rtype, "Reale")) res=-5;
+		else if (!strcmp(rtype, "Carattere")) res=7;
+	}
+	return res;
+}
+
+/* Checks if the comparison can be done given the datatype on the left and the one on the right */
+static int check_compare(char * ltype, char * rtype) {
+	int res=0;	/* if it remains unchanged, then the two datatypes are the same */
+	if (!strcmp(ltype, "Intero")) {
+		if (!strcmp(rtype, "Reale")) res=1;
+		else if (!strcmp(rtype, "Carattere")) res=2;
+		else if (!strcmp(rtype, "Stringa")) res=-1;
+	} else if (!strcmp(ltype, "Reale")) {
+		if (!strcmp(rtype, "Intero")) res=3;
+		else if (!strcmp(rtype, "Carattere")) res=4;
+		else if (!strcmp(rtype, "Stringa")) res=-2;
+	} else if (!strcmp(ltype, "Carattere")) {
+		if (!strcmp(rtype, "Intero")) res=5;
+		else if (!strcmp(rtype, "Reale")) res=6;
+		else if (!strcmp(rtype, "Stringa")) res=-3;
+	} else if (!strcmp(ltype, "Stringa")) {
+		if (!strcmp(rtype, "Intero")) res=-4;
+		else if (!strcmp(rtype, "Reale")) res=-5;
+		else if (!strcmp(rtype, "Carattere")) res=-6;
+	}
+	return res;
+}
+
+/* Returns the converted type in C given the one of BPC */
+static int get_convtype(char * type) {
 	int res;
 	if (!strcmp(type, "Intero")) res=0;
 	else if (!strcmp(type, "Reale")) res=1;
@@ -453,18 +473,18 @@ static int getConvtype(char *type) {	// returns the converted type in C language
 	return res;
 }
 
-static char * getVal(struct node *n) {		// returns val converted in C language
+/* Returns val converted in C */
+static char * get_val(struct node * n) {
 	char *val, *Lval, *Rval, *typeLvalue, *typeRvalue, convtype[7];
 	if (n->left==NULL && n->right==NULL) {
 		val = (char *) malloc (strlen(n->token)+1);
 		sprintf(val, "%s", n->token);
-	}
-	else {
+	} else {
 		typeLvalue = (get_type(n->left->token) == NULL) ? n->left->typenode : get_type(n->left->token);
 		typeRvalue = (get_type(n->right->token) == NULL) ? n->right->typenode : get_type(n->right->token);
-		Lval = getVal(n->left);
-		Rval = getVal(n->right);
-		switch(getConvtype(n->typenode)) {
+		Lval = get_val(n->left);
+		Rval = get_val(n->right);
+		switch (get_convtype(n->typenode)) {
 			case 0: {
 				strcpy(convtype, "int");
 				break;
@@ -494,8 +514,7 @@ static char * getVal(struct node *n) {		// returns val converted in C language
 					if (!strcmp(n->token, "+")) {
 						val = (char *) malloc (30+strlen(Lval)+strlen(Rval));
 						sprintf(val, "strdup(concat(%s, charToStr(%s)))", Lval, Rval);
-					}
-					else if (!strcmp(n->token, "%")) {
+					} else if (!strcmp(n->token, "%")) {
 						val = (char *) malloc (26+strlen(Lval)+strlen(Rval));
 						sprintf(val, "isSubstr(%s, charToStr(%s))", Lval, Rval);
 					}
@@ -504,8 +523,7 @@ static char * getVal(struct node *n) {		// returns val converted in C language
 					if (!strcmp(n->token, "+")) {
 						val = (char *) malloc (30+strlen(Lval)+strlen(Rval));
 						sprintf(val, "strdup(concat(charToStr(%s), %s))", Lval, Rval);
-					}
-					else if (!strcmp(n->token, "%")) {
+					} else if (!strcmp(n->token, "%")) {
 						val = (char *) malloc (24+strlen(Lval)+strlen(Rval));
 						sprintf(val, "isSubstr(charToStr(%s), %s)", Lval, Rval);
 					}
@@ -516,12 +534,10 @@ static char * getVal(struct node *n) {		// returns val converted in C language
 				if (!strcmp(n->token, "*")) {
 					val = (char *) malloc (18+strlen(Lval)+strlen(Rval));
 					sprintf(val, "getCharN(%s, (int)%s)", Lval, Rval);
-				}
-				else if (!strcmp(n->token, "-")) {
+				} else if (!strcmp(n->token, "-")) {
 					val = (char *) malloc (21+strlen(Lval)+strlen(Rval));
 					sprintf(val, "delNChar(%s, (int)%s, 1)", Lval, Rval);
-				}
-				else if (!strcmp(n->token, "/")) {
+				} else if (!strcmp(n->token, "/")) {
 					val = (char *) malloc (21+strlen(Lval)+strlen(Rval));
 					sprintf(val, "delNChar(%s, (int)%s, 0)", Lval, Rval);
 				}
@@ -532,13 +548,11 @@ static char * getVal(struct node *n) {		// returns val converted in C language
 					if (!strcmp(n->token, "+")) {
 						val = (char *) malloc (18+strlen(Lval)+strlen(Rval));
 						sprintf(val, "strdup(concat(%s, %s))", Lval, Rval);
-					}
-					else if (!strcmp(n->token, "%")) {
+					} else if (!strcmp(n->token, "%")) {
 						val = (char *) malloc (13+strlen(Lval)+strlen(Rval));
 						sprintf(val, "isSubstr(%s, %s)", Lval, Rval);
 					}
-				}
-				else {
+				} else {
 					val = (char *) malloc (5+strlen(Lval)+strlen(Rval));
 					sprintf(val, "(%s %s %s)", Lval, n->token, Rval);
 				}
@@ -549,20 +563,21 @@ static char * getVal(struct node *n) {		// returns val converted in C language
 	return val;
 }
 
-static char * getCondition(struct node *n) {	// returns the condition in C language
+/* Returns the condition in C */
+static char * get_condition(struct node * n) {
 	char *condition, operator[3], *Lval, *Rval, *typeLvalue, *typeRvalue; 
-	Lval = getVal(n->left);
-	Rval = getVal(n->right);
+	Lval = get_val(n->left);
+	Rval = get_val(n->right);
 	typeLvalue = (get_type(n->left->token) == NULL) ? n->left->typenode : get_type(n->left->token);
 	typeRvalue = (get_type(n->right->token) == NULL) ? n->right->typenode : get_type(n->right->token);
-	if(!strcmp(n->token, "<")) strcpy(operator, "<");
+	if (!strcmp(n->token, "<")) strcpy(operator, "<");
 	else if (!strcmp(n->token, "<=")) strcpy(operator, "<=");
 	else if (!strcmp(n->token, ">")) strcpy(operator, ">");
 	else if (!strcmp(n->token, ">=")) strcpy(operator, ">=");
 	else if (!strcmp(n->token, "=")) strcpy(operator, "==");
 	else strcpy(operator, "!=");
-	if(strcmp(typeLvalue, "Stringa")) {
-		switch(check_compare(typeLvalue,typeRvalue)) {
+	if (strcmp(typeLvalue, "Stringa")) {
+		switch (check_compare(typeLvalue,typeRvalue)) {
 			case 1:
 			case 2: {
 				condition = (char *) malloc (11+strlen(Lval)+strlen(Rval));
@@ -595,50 +610,47 @@ static char * getCondition(struct node *n) {	// returns the condition in C langu
 				break;
 			}
 		}
-	}
-	else {
+	} else {
 		condition = (char *) malloc (16+strlen(Lval)+strlen(Rval));
 		sprintf(condition, "strcmp(%s, %s) %s 0", Lval, operator, Rval);
 	}
 	return condition;
 }
 
-static char * getConditions(struct node *n) {	// returns the conditions in C language
+/* Returns the conditions in C */
+static char * get_conditions(struct node * n) {
 	char *conditions, *Lval, *Rval;
-	if(!strcmp(n->right->token, "AND") || !strcmp(n->right->token, "OR")) {	// multiple conditions branch
-		Lval = getCondition(n->left);
-		Rval = getConditions(n->right);
+	if(!strcmp(n->right->token, "AND") || !strcmp(n->right->token, "OR")) {	/* Multiple conditions branch */
+		Lval = get_condition(n->left);
+		Rval = get_conditions(n->right);
 		conditions = (char *) malloc (5+strlen(Lval)+strlen(Rval));
 		if (!strcmp(n->token, "AND")) {
 			sprintf(conditions, "%s && %s", Lval, Rval);
-		}
-		else if (!strcmp(n->token, "OR")) {
+		} else if (!strcmp(n->token, "OR")) {
 			sprintf(conditions, "%s || %s", Lval, Rval);
 		}
-	}
-	else {
-		if (!strcmp(n->token, "AND")) {	// couple conditions branch
-			Lval = getCondition(n->left);
-			Rval = getCondition(n->right);
+	} else {
+		if (!strcmp(n->token, "AND")) {	/* Single pair of conditions branch */
+			Lval = get_condition(n->left);
+			Rval = get_condition(n->right);
 			conditions = (char *) malloc (5+strlen(Lval)+strlen(Rval));
 			sprintf(conditions, "%s && %s", Lval, Rval);
-		}
-		else if (!strcmp(n->token, "OR")) {
-			Lval = getCondition(n->left);
-			Rval = getCondition(n->right);
+		} else if (!strcmp(n->token, "OR")) {
+			Lval = get_condition(n->left);
+			Rval = get_condition(n->right);
 			conditions = (char *) malloc (5+strlen(Lval)+strlen(Rval));
 			sprintf(conditions, "%s || %s", Lval, Rval);
-		}
-		else { // single condition branck
-			conditions = getCondition(n);
+		} else { /* Single condition branch */
+			conditions = get_condition(n);
 		}
 	}
 	return conditions;
 }
 
-static char * getDeclaration(struct node *n) {		// returns the declaration in C language
+/* Returns the declaration in C */
+static char * get_declaration(struct node * n) {
 	char *declaration, convtype[7];
-	switch(getConvtype(get_type(n->right->token))) {
+	switch(get_convtype(get_type(n->right->token))) {
 		case 0: {
 			strcpy(convtype, "int");
 			break;
@@ -661,17 +673,17 @@ static char * getDeclaration(struct node *n) {		// returns the declaration in C 
 	return declaration;
 }
 
-static char * getAssignment(struct node *n) {		// returns the assignment in C language
+/* Returns the assignment in C */
+static char * get_assignment(struct node * n) {
 	char *assignment, *Rval, *typeRvalue ;
-	Rval = getVal(n->right);
+	Rval = get_val(n->right);
 	typeRvalue = (get_type(n->right->token) == NULL) ? n->right->typenode : get_type(n->right->token);
 	switch(check_assignment(get_type(n->left->token), typeRvalue)) {
 		case 0: {
 			if(strcmp(get_type(n->left->token), "Stringa")) {
 				assignment = (char *) malloc (strlen(n->left->token)+strlen(Rval));
 				sprintf(assignment, "%s = %s;\n", n->left->token, Rval);
-			}
-			else {
+			} else {
 				assignment = (char *) malloc (13+strlen(n->left->token)+strlen(Rval));
 				sprintf(assignment, "strcpy(%s, %s);\n", n->left->token, Rval);
 			}
@@ -704,23 +716,25 @@ static char * getAssignment(struct node *n) {		// returns the assignment in C la
 	return assignment;
 }
 
-static char * getWhile(struct node *n) {	// returns the while in C language
+/* Returns the while in C */
+static char * get_while(struct node * n) {
 	char *whileBlock, *whileCond, *whileCode;
-	whileCond = getConditions(n->left);
-	whileCode = generateCode(n->right);
+	whileCond = get_conditions(n->left);
+	whileCode = generate_code(n->right);
 	whileBlock = (char *) malloc (14+strlen(whileCond)+strlen(whileCode));
 	sprintf(whileBlock, "while (%s) {\n%s}\n", whileCond, whileCode);
 	return whileBlock;
 }
 
-static char * getIfElse(struct node *n) {	// retruns the if-else in C language
+/* Returns the if-else in C */
+static char * get_if_else(struct node * n) {
 	char *ifBlock, *elseBlock, *ifCond, *ifCode, *elseCode;
-	ifCond = getCondition(n->left->left);
-	ifCode = generateCode(n->left->right);
+	ifCond = get_condition(n->left->left);
+	ifCode = generate_code(n->left->right);
 	ifBlock = (char *) malloc (11+strlen(ifCond)+strlen(ifCode));
 	sprintf(ifBlock, "if (%s) {\n%s}\n", ifCond, ifCode);
 	if (n->right != NULL) {
-		elseCode = generateCode(n->right->right);
+		elseCode = generate_code(n->right->right);
 		elseBlock = (char *) malloc (10+strlen(elseCode));
 		sprintf(elseBlock, "else {\n%s}\n", elseCode);
 		strcat(ifBlock,elseBlock);
@@ -728,75 +742,73 @@ static char * getIfElse(struct node *n) {	// retruns the if-else in C language
 	return ifBlock;
 }
 
-static char * getIO(struct node *n) {		// returns I/O operations from stdin and stdout in C language
+/* Returns I/O operations from stdin and stdout in C */
+static char * get_io(struct node * n) {
 	char *inputOutput, convpattern[4], *type, *Rval;
 	type = (get_type(n->right->token)!=NULL) ? get_type(n->right->token) : n->right->typenode;
 	if (!strcmp(type, "Intero")) strcpy(convpattern, "%d");
 	else if (!strcmp(type, "Reale")) strcpy(convpattern, "%lf");
 	else if (!strcmp(type, "Carattere")) strcpy(convpattern, "%c");
 	else if (!strcmp(type, "Stringa")) strcpy(convpattern, "%s");
-	if(!strcmp(n->left->token, "LEGGI")) {
+	if (!strcmp(n->left->token, "LEGGI")) {
 		inputOutput = (char *) malloc (18+strlen(n->right->token));
 		if(strcmp(type, "Stringa")) {
 			sprintf(inputOutput, "scanf(\"%s\", &%s);\n", convpattern, n->right->token);
-		} 
-		else {
+		} else {
 			sprintf(inputOutput, "%s = getStringa();\n", n->right->token);
 		}
-	}
-	else {
-		Rval = getVal(n->right);
+	} else {
+		Rval = get_val(n->right);
 		inputOutput = (char *) malloc (18+strlen(Rval));
 		sprintf(inputOutput, "printf(\"%s\", %s);\n", convpattern, Rval);
 	}
 	return inputOutput;
 }
 
-static char * getStatement(struct node *n) {	// returns any statement in C language
+/* General translation function to C */
+static char * get_statement(struct node * n) {
 	char *stat;
 	if (!strcmp(n->token, "DICHIARAZIONE")) {
-		stat = getDeclaration(n);
-	}
-	else if (!strcmp(n->token, "ASSEGNAMENTO")) {
-		stat = getAssignment(n);
-	}
-	else if (!strcmp(n->token, "MENTRE")) {
-		stat = getWhile(n);
-	}
-	else if (!strcmp(n->token, "SE-ALTRIMENTI")) {
-		stat = getIfElse(n);
-	}
-	else if (!strcmp(n->token, "I/O")) {
-		stat = getIO(n);
+		stat = get_declaration(n);
+	} else if (!strcmp(n->token, "ASSEGNAMENTO")) {
+		stat = get_assignment(n);
+	} else if (!strcmp(n->token, "MENTRE")) {
+		stat = get_while(n);
+	} else if (!strcmp(n->token, "SE-ALTRIMENTI")) {
+		stat = get_if_else(n);
+	} else if (!strcmp(n->token, "I/O")) {
+		stat = get_io(n);
 	}
 	return stat;
 }
 
-static char * generateCode(struct node *n) {	// generates the whole code in C language
+/* Generates the whole code in C */
+static char * generate_code(struct node * n) {
 	char *Lbranch, *Rbranch;
 	if (n!=NULL && !strcmp(n->token, "STATEMENTS")) {
-		Lbranch = (n->left!=NULL) ? strdup(getStatement(n->left)) : strdup("");
-		Rbranch = (n->right!=NULL) ? strdup(generateCode(n->right)) : strdup("");
+		Lbranch = (n->left!=NULL) ? strdup(get_statement(n->left)) : strdup("");
+		Rbranch = (n->right!=NULL) ? strdup(generate_code(n->right)) : strdup("");
 		return strcat(Lbranch, Rbranch);
-	}
-	else {
-		return strdup(getStatement(n));
+	} else {
+		return strdup(get_statement(n));
 	}
 }
 
-static void returnTree(struct node *tree, int indent) {	// fun to print parse tree
+/* Function to print the parse tree */
+static void return_tree(struct node * tree, int indent) {
 	printf("%s\n", tree->token);
 	if (tree->left) {
 		for(int i=0; i<=indent; printf("\t"),i++);
-		returnTree(tree->left, indent+1);
-	}
+		return_tree(tree->left, indent+1);
+	} 
 	if (tree->right) {
 		for(int i=0; i<=indent; printf("\t"),i++);
-		returnTree(tree->right, indent+1);
+		return_tree(tree->right, indent+1);
 	}
 }
 
-static void freeTable() {
+/* Deallocates the symbol table */
+static void free_table(void) {
 	if(first) {
 		selected = first;
 		while(selected->next!=NULL) {
@@ -807,19 +819,27 @@ static void freeTable() {
 	}
 }
 
-static void freeTree(struct node *tree) {
+/* Deallocates the parse tree */
+static void free_tree(struct node * tree) {
 	if (tree) {
 		if (tree->left) {
-			freeTree(tree->left);
+			free_tree(tree->left);
 		}
 		if (tree->right) {
-			freeTree(tree->right);
+			free_tree(tree->right);
 		}
 		free(tree);
 	}
 }
 
-void getTable() {	// fun to print symbol table
+/* Deallocates symbol table and parse tree */
+void free_all() {
+	free_table();
+	free_tree(head);
+}
+
+/* Function to print the symbol table */
+void get_table(void) {
 	printf("SYMBOL\t\tDATATYPE\t\tLINE\n\n");
 	for (selected = first; selected != NULL; selected = selected->next) {
 		printf("%s\t\t%s\t\t%d\n", selected->row.id_name, selected->row.data_type, selected->row.line);
@@ -827,12 +847,14 @@ void getTable() {	// fun to print symbol table
 	printf("\n");
 }
     
-void getTree() {	// fun to print the parse tree
-	returnTree(head, 0);
+/* Function to print the parse tree */
+void get_tree(void) {
+	return_tree(head, 0);
 }
 
-void getCode(FILE *out) {	// fun to get the compiled code
-	char *code = generateCode(head);
+/* Function to get the compiled code */
+void get_code(FILE *out) {
+	char *code = generate_code(head);
 	fprintf(out, "%s", includes);
 	fprintf(out, "%s", cts);
 	fprintf(out, "%s", cnct);
@@ -846,22 +868,12 @@ void getCode(FILE *out) {	// fun to get the compiled code
 	free(code);
 }
 
-void getErrors() {	// fun to print the errors generated during the compiling
+/* Prints the errors generated during compiling */
+void get_errors(void) {
 	printf("%d errors\n", err_num);
 	for (int i=0; i<err_num; i++) {
 		printf("%s", errors[i]);
 		free(errors[i]);
     }
 	free(errors);
-}
-
-void freeAll() {
-	freeTable();
-	freeTree(head);
-}
-
-void yyerror(const char* msg) {		// it's called by default by lex/yacc when a syntax error occours
-	char temp_error[BUFSIZ];
-	sprintf(temp_error, "Line %d: %s\n", countln, msg);
-	addError(temp_error);
 }

@@ -49,8 +49,9 @@ MENTRE b != 0 ALLORA <!
 	a <- b
 	b <- r
 !>
-STAMPA <- "L'MCD e' "
+STAMPA <- "The GCD is "
 STAMPA <- a
+STAMPA <- "\n"
 ```
 
 ## Functioning
